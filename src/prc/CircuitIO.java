@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.PrintWriter;
 import java.util.Set;
-import javax.imageio.IIOException;
 
 /**
  *

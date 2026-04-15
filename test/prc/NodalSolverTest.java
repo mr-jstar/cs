@@ -23,7 +23,8 @@ public class NodalSolverTest {
         CircuitFactory instance = new CircuitFactory();
         GridPassiveResistiveCircuit c = instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
         NodalSolver s = new NodalSolver(c, 0, 3, 1);
-        double [] v = s.getPotentials(1e-6);
+        s.solve(1e-6);
+        double [] v = s.getPotential();
         assertEquals(4,v.length);
         assertEquals(0.0, v[0], 1e-6);
         assertEquals(1.0, v[3], 1e-6);
@@ -32,8 +33,9 @@ public class NodalSolverTest {
         nCols = 3;
         nRows = 3;
         c = instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
-        s = new NodalSolver(c, 0, 3, 13); 
-        v = s.getPotentials(1e-6);
+        s = new NodalSolver(c, 0, 3, 13);
+        s.solve(1e-6);
+        v = s.getPotential();
         assertEquals(4,v.length);
         assertEquals(0.0, v[0], 1e-6);
         assertEquals(13.0, v[3], 1e-6);
