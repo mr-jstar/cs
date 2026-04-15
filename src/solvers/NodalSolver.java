@@ -230,8 +230,8 @@ public class NodalSolver {
     }
 
     public static void main(String[] args) {
-        int nCols = 80;
-        int nRows = 80;
+        int nCols = 23;
+        int nRows = 15;
         double minResistance = 2.0;
         double maxResistance = 2.0;
         CircuitFactory instance = new CircuitFactory();
@@ -251,7 +251,7 @@ public class NodalSolver {
             long start = System.nanoTime();
 
             //s.solve(1e-6);
-            s.solveInParallel(1e-6, 2);
+            s.solveInParallel(1e-6, 8);
 
             long end = System.nanoTime();
             long elapsed = end - start;

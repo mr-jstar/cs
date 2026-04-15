@@ -1,4 +1,3 @@
-
 package prc;
 
 import solvers.NodalSolver;
@@ -10,7 +9,7 @@ import org.junit.Test;
  * @author jstar
  */
 public class NodalSolverTest {
-    
+
     public NodalSolverTest() {
     }
 
@@ -24,8 +23,8 @@ public class NodalSolverTest {
         GridPassiveResistiveCircuit c = instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
         NodalSolver s = new NodalSolver(c, 0, 3, 1);
         s.solve(1e-6);
-        double [] v = s.getPotential();
-        assertEquals(4,v.length);
+        double[] v = s.getPotential();
+        assertEquals(4, v.length);
         assertEquals(0.0, v[0], 1e-6);
         assertEquals(1.0, v[3], 1e-6);
         assertEquals(0.5, v[1], 1e-6);
@@ -33,20 +32,19 @@ public class NodalSolverTest {
         nCols = 3;
         nRows = 3;
         c = instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
-        s = new NodalSolver(c, 0, 3, 13);
+        s = new NodalSolver(c, 0, 8, 10);
         s.solve(1e-6);
         v = s.getPotential();
-        assertEquals(4,v.length);
+        assertEquals(9, v.length);
         assertEquals(0.0, v[0], 1e-6);
-        assertEquals(13.0, v[3], 1e-6);
-        assertEquals(6.5, v[1], 1e-6);
-        assertEquals(0.5, v[2], 1e-6);
-        assertEquals(0.5, v[4], 1e-6);
-        assertEquals(0.5, v[5], 1e-6);
-        assertEquals(0.5, v[6], 1e-6);
-        assertEquals(0.5, v[7], 1e-6);
-        assertEquals(0.5, v[8], 1e-6);
-        assertEquals(0.5, v[9], 1e-6);
+        assertEquals(3.333, v[1], 1e-3);
+        assertEquals(4.999, v[2], 1e-3);
+        assertEquals(3.333, v[3], 1e-3);
+        assertEquals(5.0, v[4], 1e-3);
+        assertEquals(6.666, v[5], 1e-3);
+        assertEquals(5.0, v[6], 1e-3);
+        assertEquals(6.666, v[7], 1e-3);
+        assertEquals(10.0, v[8], 1e-6);
     }
-    
+
 }

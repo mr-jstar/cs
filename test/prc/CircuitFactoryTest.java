@@ -46,15 +46,15 @@ public class CircuitFactoryTest {
         GridPassiveResistiveCircuit result = instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
         assertEquals(nCols*nRows, result.noNodes());
         for( int i= 1; i < result.noNodes(); i++ ) {
-            System.out.println((i-1) + "-" + i);
+            //System.out.println((i-1) + "-" + i);
             if( i % nRows != 0 )
                 assertEquals(1.0, result.resistance(i-1, i),0.0);
             else
                 assertEquals(Double.POSITIVE_INFINITY, result.resistance(i-1, i),0.0);
         }
-        System.out.println("---");
+        //System.out.println("---");
         for( int i= 0; i < result.noNodes()-1; i++ ) {
-            System.out.println(i + "-" + (i+1));
+            //System.out.println(i + "-" + (i+1));
             if( i % nRows != nRows-1 )
                 assertEquals(1.0, result.resistance(i+1, i),0.0);
             else
