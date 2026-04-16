@@ -40,16 +40,17 @@ public class NodalSolver {
         this.sourceValues[0] = v;
     }
 
-    public void solve(double tolerance) {
+    public void solve(double tolerance, int maxit) {
         boolean stop = false;
         double[] cV = new double[c.noNodes()];
         double[] pV = new double[c.noNodes()];
         boolean[] active = new boolean[c.noNodes()];
         Arrays.fill(active, true);
-        int maxit = cV.length * 10;
-        for (int g : groundNodes) {
-            pV[g] = 0.0;
-            active[g] = false;
+        if (groundNodes != null) {
+            for (int g : groundNodes) {
+                pV[g] = 0.0;
+                active[g] = false;
+            }
         }
         for (int i = 0; i < sourceNodes.length; i++) {
             pV[sourceNodes[i]] = sourceValues[i];
@@ -58,8 +59,10 @@ public class NodalSolver {
         double maxErr;
         err.clear();
         for (int it = 0; it < maxit && !stop; it++) {
-            for (int g : groundNodes) {
-                cV[g] = 0;
+            if (groundNodes != null) {
+                for (int g : groundNodes) {
+                    cV[g] = 0;
+                }
             }
             for (int i = 0; i < sourceValues.length; i++) {
                 cV[sourceNodes[i]] = sourceValues[i];
@@ -165,18 +168,19 @@ public class NodalSolver {
 
     }
 
-    public void solveInParallel(double tolerance, int nThreads) throws InterruptedException, BrokenBarrierException {
+    public void solveInParallel(double tolerance, int maxit, int nThreads) throws InterruptedException, BrokenBarrierException {
         boolean stop = false;
         int n = c.noNodes();
         double[] cV = new double[n];
         double[] pV = new double[n];
         boolean[] active = new boolean[n];
         Arrays.fill(active, true);
-        int maxit = cV.length;
-        for (int g : groundNodes) {
-            pV[g] = 0;
-            cV[g] = 0;
-            active[g] = false;
+        if (groundNodes != null) {
+            for (int g : groundNodes) {
+                pV[g] = 0;
+                cV[g] = 0;
+                active[g] = false;
+            }
         }
         for (int i = 0; i < sourceValues.length; i++) {
             pV[sourceNodes[i]] = sourceValues[i];
@@ -189,13 +193,15 @@ public class NodalSolver {
         SolvingThread[] threads = new SolvingThread[nThreads];
         double[] currErrors = new double[nThreads];
         int perThread = n / nThreads;
-        if( n % nThreads != 0 )
+        if (n % nThreads != 0) {
             perThread++;
+        }
         for (int i = 0; i < nThreads; i++) {
             threads[i] = new SolvingThread(i, c, pV, cV, active, currErrors, i * perThread, (i + 1) * perThread > n ? n : (i + 1) * perThread, barrier);
             threads[i].start();
         }
-        for (it = 0; it < maxit; it++) {
+        stop = false;
+        for (it = 0; it < maxit && ! stop; it++) {
             //System.out.println("Main at 1st barrier");
             barrier.await();
             double maxErr = currErrors[0];
@@ -210,10 +216,13 @@ public class NodalSolver {
                 for (int i = 0; i < nThreads; i++) {
                     threads[i].stop = true;
                 }
+                stop = true;
             } else {
                 System.arraycopy(cV, 0, pV, 0, cV.length);
-                for (int g : groundNodes) {
-                    cV[g] = 0;
+                if (groundNodes != null) {
+                    for (int g : groundNodes) {
+                        cV[g] = 0;
+                    }
                 }
                 for (int i = 0; i < sourceValues.length; i++) {
                     cV[sourceNodes[i]] = sourceValues[i];
@@ -230,8 +239,8 @@ public class NodalSolver {
     }
 
     public static void main(String[] args) {
-        int nCols = 23;
-        int nRows = 15;
+        int nCols = 15;
+        int nRows = 10;
         double minResistance = 2.0;
         double maxResistance = 2.0;
         CircuitFactory instance = new CircuitFactory();
@@ -247,11 +256,11 @@ public class NodalSolver {
                 vls[i] = 1;
             }
             NodalSolver s = new NodalSolver(c, gnd, src, vls);
-            
+
             long start = System.nanoTime();
 
-            //s.solve(1e-6);
-            s.solveInParallel(1e-6, 8);
+            //s.solve(1e-6, c.noNodes());
+            s.solveInParallel(1e-6, c.noNodes(), 8);
 
             long end = System.nanoTime();
             long elapsed = end - start;
@@ -261,10 +270,11 @@ public class NodalSolver {
             System.out.println("Czas [s]: " + elapsed / 1e9);
 
             double[] v = s.getPotential();
-            if( v.length < 50)
+            if (v.length < 50) {
                 for (Double i : v) {
                     System.out.println(i);
                 }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

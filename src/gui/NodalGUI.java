@@ -11,6 +11,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +20,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import prc.CircuitIO;
 import prc.PassiveResistiveCircuit;
+import solvers.NodalSolver;
 
 public class NodalGUI extends JFrame {
 
@@ -42,6 +44,10 @@ public class NodalGUI extends JFrame {
     private final String DEFAULT_BND_TEXT = "Set potential(s)";
 
     private PassiveResistiveCircuit circ;
+    private double[] V;
+    private double tolerance = 1e-6;
+    private int maxit = 100;
+    private int nThreads = Runtime.getRuntime().availableProcessors();
 
     private final Map<String, Boolean> options = new HashMap<>();
     private final Set<Integer> currentSelection = new TreeSet<>();
@@ -126,18 +132,38 @@ public class NodalGUI extends JFrame {
         fileMenu.addSeparator();
         fileMenu.add(exitItem);
 
-        JMenu setupMenu = new JMenu("Setup");
+        JMenu circuitMenu = new JMenu("Circuit");
         JMenuItem srcItem = new JMenuItem("Add potentials");
         srcItem.setFont(currentFont);
         srcItem.addActionListener(e -> modifySources());
-        setupMenu.add(srcItem);
+        circuitMenu.add(srcItem);
         JMenuItem clrsrcItem = new JMenuItem("Clear potentials");
         clrsrcItem.setFont(currentFont);
         clrsrcItem.addActionListener(e -> clearSources());
-        setupMenu.add(clrsrcItem);
+        circuitMenu.add(clrsrcItem);
+        circuitMenu.addSeparator();
+        JMenuItem solveItem = new JMenuItem("Solve");
+        solveItem.setFont(currentFont);
+        solveItem.addActionListener(e -> solve());
+        circuitMenu.add(solveItem);
 
         JMenu optionsMenu = new JMenu("Options");
+        JMenuItem tolItem = new JMenuItem("Tolerance (solver)");
+        tolItem.setFont(currentFont);
+        tolItem.addActionListener(e -> {
+            tolerance = Double.parseDouble(readSomething("Value=", "Tolerance", "" + tolerance));
+        });
+        optionsMenu.add(tolItem);
+        optionsMenu.addSeparator();
+        JMenuItem maxitItem = new JMenuItem("Max # of iterations (solver)");
+        maxitItem.setFont(currentFont);
+        maxitItem.addActionListener(e -> {
+            maxit = Integer.parseInt(readSomething("Number=", "Max # of iterations", "" + maxit));
+        });
+        optionsMenu.add(maxitItem);
+        optionsMenu.addSeparator();
         optionsMenu.add(new JMenuItem("Font size"));
+        ButtonGroup fgroup = new ButtonGroup();
         for (Font f : fonts) {
             JRadioButtonMenuItem fontOpt = new JRadioButtonMenuItem("\t\t\t" + String.valueOf(f.getSize()));
             final Font cf = f;
@@ -149,11 +175,12 @@ public class NodalGUI extends JFrame {
                 UIManager.put("OptionPane.messageFont", currentFont);
             });
             fontOpt.setSelected(f == currentFont);
+            fgroup.add(fontOpt);
             optionsMenu.add(fontOpt);
         }
 
         menuBar.add(fileMenu);
-        menuBar.add(setupMenu);
+        menuBar.add(circuitMenu);
         menuBar.add(optionsMenu);
 
         setJMenuBar(menuBar);
@@ -167,10 +194,12 @@ public class NodalGUI extends JFrame {
             File circuitFile = fileChooser.getSelectedFile();
             try {
                 circ = CircuitIO.readPassiveResistiveCircuit(circuitFile.getAbsolutePath());
-                saveLastUsedDirectory(circuitFile.getParent());
+                V = null;
+                maxit = 10 * circ.noNodes();
                 sources.clear();
                 currentSelection.clear();
                 canvasPanel.repaint();
+                saveLastUsedDirectory(circuitFile.getParent());
                 message.setText("Circuit loaded from: " + circuitFile.getAbsolutePath() + "\n" + circ.noNodes() + " nodes");
             } catch (Exception e) {
                 circ = null;
@@ -198,12 +227,18 @@ public class NodalGUI extends JFrame {
     }
 
     private void clearSources() {
+        if (circ == null) {
+            return;
+        }
         sources.clear();
         currentSelection.clear();
         canvasPanel.repaint();
     }
 
     private void modifySources() {
+        if (circ == null) {
+            return;
+        }
         if (options.get("inDefBoundary")) {
             if (currentSelection.isEmpty()) {
                 if (JOptionPane.showConfirmDialog(this, "No nodes selected, want to try again?",
@@ -215,7 +250,8 @@ public class NodalGUI extends JFrame {
             } else {
                 double value;
                 try {
-                    String m = JOptionPane.showInputDialog(this, "Value?", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
+                    String m = readSomething("Value?", DEFAULT_BND_TEXT, "");
+                    //JOptionPane.showInputDialog(this, "Value?", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                     if (m == null) {
                         throw new NumberFormatException();
                     }
@@ -223,6 +259,7 @@ public class NodalGUI extends JFrame {
                     for (Integer v : currentSelection) {
                         sources.put(v, value);
                     }
+                    V = null;
                     options.put("inDefBoundary", false);
                     message.setText("OK");
                 } catch (NumberFormatException e) {
@@ -239,9 +276,70 @@ public class NodalGUI extends JFrame {
                                                     drag mouse to select/deselect all nodes in the rectangle
                                                     when done click "Setup->Add potentials" again or press ESC
                                                     to be asked for the value.""", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
-            
+
             options.put("inDefBoundary", true);
             currentSelection.clear();
+        }
+    }
+
+    public void solve() {
+        if (circ != null && sources.size() > 1) {
+            int[] srcNodes = new int[sources.size()];
+            double[] srcValues = new double[sources.size()];
+            int i = 0;
+            for (int src : sources.keySet()) {
+                srcNodes[i] = src;
+                srcValues[i] = sources.get(src);
+                i++;
+            }
+
+            NodalSolver s = new NodalSolver(circ, null, srcNodes, srcValues);
+            Thread solver = new Thread() {
+                @Override
+                public void run() {
+                    message.setText("Solving...");
+                    try {
+                        s.solveInParallel(tolerance, maxit, nThreads);
+                        System.out.println("solver with " + nThreads + " threads for maxit=" + maxit + " and tol=" + tolerance + " has finished.");
+                    } catch (Exception ex) {
+                        message.setText("The solver was interrupted: " + ex.getMessage());
+                        return;
+                    }
+                    V = s.getPotential();
+                    List<Double> err = s.err();
+                    if (err.isEmpty() || err.get(err.size() - 1) > tolerance) {
+                        message.setText("The solver failed to converge, err=" + err.get(err.size() - 1));
+                    } else {
+                        message.setText("The solver converged in " + err.size() + " iterations.");
+                    }
+                }
+            };
+            solver.start();
+        }
+    }
+
+    // Helper - open dialog and read something
+    private String readSomething(String prompt, String title, String defaultValue) {
+        try {
+            JTextField field = new JTextField(defaultValue);
+            field.setFont(currentFont);
+
+            JOptionPane pane = new JOptionPane(
+                    new Object[]{prompt, field},
+                    JOptionPane.QUESTION_MESSAGE,
+                    JOptionPane.OK_CANCEL_OPTION
+            );
+
+            JDialog dialog = pane.createDialog(title);
+            dialog.setVisible(true);
+            String m = field.getText();
+            if (m == null) {
+                throw new NumberFormatException();
+            }
+            return m;
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Invalid value.", prompt, JOptionPane.QUESTION_MESSAGE);
+            return defaultValue;
         }
     }
 
@@ -267,9 +365,18 @@ public class NodalGUI extends JFrame {
         canvasPanel = new JPanel() {
             private int prevX, prevY;
             private int currX, currY;
-            private int vertexSelectionRadius;
+            private int vertexSelectionCircle;
+
+            JWindow tooltip = new JWindow(NodalGUI.this);
+            JLabel label = new JLabel("");
+            Timer hideTimer = new Timer(2000, e -> tooltip.setVisible(false));
 
             {
+                label.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                label.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+                tooltip.add(label);
+                tooltip.pack();
+                hideTimer.setRepeats(false);
                 addMouseListener(new MouseAdapter() {
                     @Override
                     public void mouseClicked(MouseEvent e) {
@@ -291,6 +398,40 @@ public class NodalGUI extends JFrame {
 
                     @Override
                     public void mousePressed(MouseEvent e) {
+                        if (tooltip.isVisible()) {
+                            tooltip.setVisible(false);
+                            hideTimer.stop();
+                        }
+                        if (e.getButton() == MouseEvent.BUTTON2) {
+                            //System.out.println("(" + e.getX() + "," + e.getY() + ")");
+                            int nV = findNearestVertex(e.getX(), e.getY());
+                            //System.out.println(elementData);
+                            if (V != null && nV >= 0) {
+                                message.setText("V=" + V[nV]);
+                                label.setText("V=" + V[nV]);
+                                label.setFont(currentFont);
+                                tooltip.pack();
+                                Point pt = e.getLocationOnScreen();
+                                tooltip.setLocation(pt.x, pt.y);
+                                tooltip.setVisible(true);
+                                hideTimer.restart();
+                            }
+                        }
+                        if (e.getButton() == MouseEvent.BUTTON3) {
+                            //System.out.println("(" + e.getX() + "," + e.getY() + ")");
+                            String elementData = findElement(e.getX(), e.getY());
+                            //System.out.println(elementData);
+                            if (elementData != null) {
+                                message.setText(elementData);
+                                label.setText(elementData);
+                                label.setFont(currentFont);
+                                tooltip.pack();
+                                Point pt = e.getLocationOnScreen();
+                                tooltip.setLocation(pt.x, pt.y);
+                                tooltip.setVisible(true);
+                                hideTimer.restart();
+                            }
+                        }
                         prevX = e.getX();
                         prevY = e.getY();
                     }
@@ -313,17 +454,42 @@ public class NodalGUI extends JFrame {
 
             // Helper -finds vertex nearest to (x,y) - clicked by the mouse
             private int findNearestVertex(int x, int y) {
+                //System.out.print("circle=" + vertexSelectionCircle + " ");
                 int nV = -1;
                 int minDistance = Integer.MAX_VALUE;
                 for (int v = 0; v < xy.size(); v++) {
                     PointPosition p = xy.get(v);
                     int distance = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
-                    if (distance < minDistance && distance < vertexSelectionRadius) {
+                    if (distance < minDistance && distance < vertexSelectionCircle) {
                         minDistance = distance;
                         nV = v;
                     }
                 }
                 return nV;
+            }
+
+            // Helper -finds vertex nearest to (x,y) - clicked by the mouse
+            private String findElement(int x, int y) {
+                int nV = findNearestVertex(x, y);
+                //System.out.println("nV=" + nV);
+                if (nV >= 0) {
+                    int minDistance = Integer.MAX_VALUE;
+                    int sV = nV;
+                    for (int n : circ.neighbourNodes(nV)) {
+                        PointPosition p = xy.get(n);
+                        int distance = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+                        if (distance < minDistance && distance < 3 * vertexSelectionCircle) {
+                            minDistance = distance;
+                            sV = n;
+                        }
+                    }
+                    //System.out.println("sV=" + sV);
+                    if (sV > -1 && sV != nV) {
+                        double R = circ.resistance(nV, sV);
+                        return "R= " + R + (V != null && R > 0 && R != Double.POSITIVE_INFINITY ? " I=" + Math.abs(V[sV] - V[nV]) / R : "");
+                    }
+                }
+                return null;
             }
 
             @Override
@@ -346,7 +512,7 @@ public class NodalGUI extends JFrame {
                 int margin = Math.min(width / 10, height / 10);
                 int nc = circ.noNodes() / nr;
                 int dist = Math.min((width - 2 * margin) / nc, (height - 2 * margin) / nr);
-                vertexSelectionRadius = dist / 3;
+                vertexSelectionCircle = 9 * dist * dist / 4;  // (0.75*dist)^2
                 for (int i = 0; i < circ.noNodes(); i++) {
                     int x = margin + dist * (i / nr);
                     int y = margin + dist * (i % nr);
