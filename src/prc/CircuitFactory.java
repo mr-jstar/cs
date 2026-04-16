@@ -8,7 +8,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class CircuitFactory {
 
-    public GridPassiveResistiveCircuit makeGridRCircuit(int nCols, int nRows, double minResistance, double maxResistance) {
+    public static GridPassiveResistiveCircuit makeGridRCircuit(int nCols, int nRows, double minResistance, double maxResistance) {
         GridCircuitImplementation circ = new GridCircuitImplementation();
         double spread = maxResistance - minResistance;
         ThreadLocalRandom rand = ThreadLocalRandom.current();

@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import prc.CircuitFactory;
 import prc.CircuitIO;
 import prc.PassiveResistiveCircuit;
 import solvers.NodalSolver;
@@ -117,22 +118,26 @@ public class NodalGUI extends JFrame {
     private void createMenuBar() {
         JMenuBar menuBar = new JMenuBar();
 
-        JMenu fileMenu = new JMenu("File");
+        JMenu fileMenu = new JMenu("Circuit");
         JMenuItem readItem = new JMenuItem("Read circuit");
         readItem.setFont(currentFont);
         readItem.addActionListener(e -> loadFile());
         fileMenu.add(readItem);
+        JMenuItem makeItem = new JMenuItem("Generate circuit");
+        makeItem.setFont(currentFont);
+        makeItem.addActionListener(e -> generateCircuit());
+        fileMenu.add(makeItem);
         JMenuItem saveItem = new JMenuItem("Save circuit");
         saveItem.setFont(currentFont);
         saveItem.addActionListener(e -> saveCircuit());
         fileMenu.add(saveItem);
+        fileMenu.addSeparator();
         JMenuItem exitItem = new JMenuItem("Exit");
         exitItem.setFont(currentFont);
         exitItem.addActionListener(e -> doExit());
-        fileMenu.addSeparator();
         fileMenu.add(exitItem);
 
-        JMenu circuitMenu = new JMenu("Circuit");
+        JMenu circuitMenu = new JMenu("Analysis");
         JMenuItem srcItem = new JMenuItem("Add potentials");
         srcItem.setFont(currentFont);
         srcItem.addActionListener(e -> modifySources());
@@ -154,13 +159,18 @@ public class NodalGUI extends JFrame {
             tolerance = Double.parseDouble(readSomething("Value=", "Tolerance", "" + tolerance));
         });
         optionsMenu.add(tolItem);
-        optionsMenu.addSeparator();
         JMenuItem maxitItem = new JMenuItem("Max # of iterations (solver)");
         maxitItem.setFont(currentFont);
         maxitItem.addActionListener(e -> {
             maxit = Integer.parseInt(readSomething("Number=", "Max # of iterations", "" + maxit));
         });
         optionsMenu.add(maxitItem);
+        JMenuItem nthreadsItem = new JMenuItem("# of parallel threads");
+        nthreadsItem.setFont(currentFont);
+        nthreadsItem.addActionListener(e -> {
+            nThreads = Integer.parseInt(readSomething("Number=", "# of parallel threads", "" + nThreads));
+        });
+        optionsMenu.add(nthreadsItem);
         optionsMenu.addSeparator();
         optionsMenu.add(new JMenuItem("Font size"));
         ButtonGroup fgroup = new ButtonGroup();
@@ -208,6 +218,27 @@ public class NodalGUI extends JFrame {
         }
     }
 
+    private void generateCircuit() {
+        try {
+            String params = readSomething("Enter col# row# Rmin Rmax", "Make grid circuit", "10 5  1.0  2.0");
+            String [] f = params.split("\\s+");
+            circ = CircuitFactory.makeGridRCircuit(
+                    Integer.parseInt(f[0]), 
+                    Integer.parseInt(f[1]), 
+              Double.parseDouble(f[2]), 
+              Double.parseDouble(f[3])
+                    );
+            maxit = 10 * circ.noNodes();
+        } catch (Exception ex) {
+            message.setText("Bad parameters");
+            circ = null;
+        }
+        V = null;
+        sources.clear();
+        currentSelection.clear();
+        canvasPanel.repaint();
+    }
+
     private void saveCircuit() {
         JFileChooser fileChooser = new JFileChooser(getLastUsedDirectory());
         setFontRecursively(fileChooser, currentFont, 0);
@@ -230,6 +261,7 @@ public class NodalGUI extends JFrame {
         if (circ == null) {
             return;
         }
+        V = null;
         sources.clear();
         currentSelection.clear();
         canvasPanel.repaint();
@@ -259,11 +291,13 @@ public class NodalGUI extends JFrame {
                     for (Integer v : currentSelection) {
                         sources.put(v, value);
                     }
+                    currentSelection.clear();
                     V = null;
                     options.put("inDefBoundary", false);
                     message.setText("OK");
                 } catch (NumberFormatException e) {
-                    JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
+                    options.put("inDefBoundary", false);
+                    JOptionPane.showMessageDialog(this, "Invalid value, try again.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                 }
                 if (printDiag) {
                     System.err.println(sources);
@@ -300,12 +334,13 @@ public class NodalGUI extends JFrame {
                     message.setText("Solving...");
                     try {
                         s.solveInParallel(tolerance, maxit, nThreads);
-                        System.out.println("solver with " + nThreads + " threads for maxit=" + maxit + " and tol=" + tolerance + " has finished.");
+                        //System.out.println("solver with " + nThreads + " threads for maxit=" + maxit + " and tol=" + tolerance + " has finished.");
                     } catch (Exception ex) {
                         message.setText("The solver was interrupted: " + ex.getMessage());
                         return;
                     }
                     V = s.getPotential();
+                    canvasPanel.repaint();
                     List<Double> err = s.err();
                     if (err.isEmpty() || err.get(err.size() - 1) > tolerance) {
                         message.setText("The solver failed to converge, err=" + err.get(err.size() - 1));
@@ -350,6 +385,20 @@ public class NodalGUI extends JFrame {
             lsd = ".";
         }
         return lsd;
+    }
+
+    // Helper - get range values in a double vector
+    private static double[] range(double[] v) {
+        double[] range = {v[0], v[0]};
+        for (int i = 1; i < v.length; i++) {
+            if (v[i] < range[0]) {
+                range[0] = v[i];
+            }
+            if (v[i] > range[1]) {
+                range[1] = v[i];
+            }
+        }
+        return range;
     }
 
     // Helper - saves the last used directory
@@ -402,7 +451,7 @@ public class NodalGUI extends JFrame {
                             tooltip.setVisible(false);
                             hideTimer.stop();
                         }
-                        if (e.getButton() == MouseEvent.BUTTON2) {
+                        if (e.getButton() == MouseEvent.BUTTON1) {
                             //System.out.println("(" + e.getX() + "," + e.getY() + ")");
                             int nV = findNearestVertex(e.getX(), e.getY());
                             //System.out.println(elementData);
@@ -570,6 +619,39 @@ public class NodalGUI extends JFrame {
                     g.drawString(String.valueOf(sources.get(b)), p.x, p.y + dh);
                 }
 
+                if (V != null) {
+                    double[] frng = range(V);
+                    ColorMap cm = new ColorMap((float) frng[0], (float) frng[1]);
+                    for (int n = 0; n < circ.noNodes(); n++) {
+                        PointPosition p = xy.get(n);
+                        g.setColor(cm.getColorForValue(V[n]));
+                        g.fillOval(p.x - 3, p.y - 3, 6, 6);
+                    }
+                    for (int i = 0; i < circ.noNodes(); i++) {
+                        for (int n : circ.neighbourNodes(i)) {
+                            if (n > i) {
+                                fillResistor(g, margin, dist, i, n, nr, cm);
+                            }
+                        }
+                    }
+                    // The legend
+                    int lwidth = (int) (0.7 * getWidth());
+                    int lheight = 20;
+                    int bottomMargin = 20;
+                    int xmargin = 3;
+                    int pxl = (int) (0.15 * getWidth());
+                    int pyl = getHeight() - lheight - bottomMargin;
+                    Image legend = cm.createColorScaleImage(lwidth, lheight, ColorMap.Menu.HORIZONTAL);
+
+                    g.drawImage(legend, pxl, pyl, this);
+                    g.setColor(Color.BLACK);
+                    String low = String.format("%.3g", frng[0]);
+
+                    g.drawString(low, pxl - getFontMetrics(currentFont).stringWidth(low) - xmargin, pyl + 3 * lheight / 4);
+                    String high = String.format("%.3g", frng[1]);
+                    g.drawString(high, pxl + lwidth + xmargin, pyl + 3 * lheight / 4);
+                }
+
             }
         };
 
@@ -603,6 +685,39 @@ public class NodalGUI extends JFrame {
             g.drawRect(rectX, yi - bodyWidth / 2, bodyHeight, bodyWidth);
             // przewód dolny
             g.drawLine(rectX + bodyHeight, yi, xj, yj);
+        }
+    }
+
+    private void fillResistor(Graphics g, int margin, int dist, int i, int j, int nr, ColorMap cm) {
+        int lead = dist / 5;          // długość przewodów
+        int bodyHeight = dist - 2 * lead;
+        int bodyWidth = dist / 5;     // szerokość prostokąta
+        int xi = margin + dist * (i / nr);
+        int yi = margin + dist * (i % nr);
+        int xj = margin + dist * (j / nr);
+        int yj = margin + dist * (j % nr);
+        if (xi == xj) { // vertical
+            //System.out.println("V" + i + "-" + j );
+            int dy = (int) Math.signum(yj - yi);
+            for (int h = 0; h < bodyHeight; h += dy) {
+                double vh = V[i] + (V[j] - V[i]) * h / bodyHeight;
+                if (vh < 0 || vh > 1.0) {
+                    System.out.println("v=" + vh);
+                }
+                g.setColor(cm.getColorForValue(vh));
+                g.drawRect(xi - bodyWidth / 2, h + yi + lead, bodyWidth, 1);
+            }
+        } else { // horizontal
+            //System.out.println("H" + i + "-" + j );
+            int dx = (int) Math.signum(xj - xi);
+            for (int w = 0; w < bodyHeight; w += dx) {
+                double vw = V[i] + (V[j] - V[i]) * w / bodyHeight;
+                if (vw < 0 || vw > 1.0) {
+                    System.out.println("v=" + vw);
+                }
+                g.setColor(cm.getColorForValue(vw));
+                g.drawRect(w + xi + lead, yi - bodyWidth / 2, 1, bodyWidth);
+            }
         }
     }
 

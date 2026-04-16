@@ -133,7 +133,7 @@ public class NodalSolver {
 
         @Override
         public void run() {
-            System.out.println("Thread " + no + " starting");
+            //System.out.println("Thread " + no + " starting");
             while (!stop) {
                 double maxErr = 0.0;
                 for (int i = firstNode; i < lastNode; i++) {
@@ -163,13 +163,13 @@ public class NodalSolver {
                     return;
                 }
             }
-            System.out.println("Thread " + no + " stopped");
+            //System.out.println("Thread " + no + " stopped");
         }
 
     }
 
     public void solveInParallel(double tolerance, int maxit, int nThreads) throws InterruptedException, BrokenBarrierException {
-        boolean stop = false;
+        boolean stop;
         int n = c.noNodes();
         double[] cV = new double[n];
         double[] pV = new double[n];
@@ -212,7 +212,7 @@ public class NodalSolver {
             }
             err.add(maxErr);
             if (maxErr <= tolerance || it == maxit - 1) { // stop
-                System.out.println("Stopping threads");
+                //System.out.println("Stopping threads");
                 for (int i = 0; i < nThreads; i++) {
                     threads[i].stop = true;
                 }
@@ -243,9 +243,8 @@ public class NodalSolver {
         int nRows = 10;
         double minResistance = 2.0;
         double maxResistance = 2.0;
-        CircuitFactory instance = new CircuitFactory();
         try {
-            CircuitIO.savePassiveResistiveCircuit(instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance), "tmp");
+            CircuitIO.savePassiveResistiveCircuit(CircuitFactory.makeGridRCircuit(nCols, nRows, minResistance, maxResistance), "tmp");
             PassiveResistiveCircuit c = CircuitIO.readPassiveResistiveCircuit("tmp");
             int[] gnd = new int[nRows];
             int[] src = new int[nRows];
