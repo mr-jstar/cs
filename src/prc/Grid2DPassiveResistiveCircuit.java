@@ -7,7 +7,7 @@ import java.util.Set;
  *
  * @author jstar
  */
-public interface GridPassiveResistiveCircuit extends PassiveResistiveCircuit {
+public interface Grid2DPassiveResistiveCircuit extends PassiveResistiveCircuit {
 
     public int getRowsNo();
 

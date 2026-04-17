@@ -8,8 +8,8 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class CircuitFactory {
 
-    public static GridPassiveResistiveCircuit makeGridRCircuit(int nCols, int nRows, double minResistance, double maxResistance) {
-        GridCircuitImplementation circ = new GridCircuitImplementation();
+    public static Grid2DPassiveResistiveCircuit makeGridRCircuit(int nCols, int nRows, double minResistance, double maxResistance) {
+        Grid2DCircuitImplementation circ = new Grid2DCircuitImplementation();
         double spread = maxResistance - minResistance;
         ThreadLocalRandom rand = ThreadLocalRandom.current();
         for (int c = 0; c < nCols; c++) {

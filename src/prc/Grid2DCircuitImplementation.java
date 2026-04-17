@@ -8,7 +8,7 @@ import java.util.Map;
  *
  * @author jstar
  */
-public class GridCircuitImplementation implements GridPassiveResistiveCircuit {
+public class Grid2DCircuitImplementation implements Grid2DPassiveResistiveCircuit {
 
     private Map<Integer, Map<Integer, Double>> columns = new HashMap<>();
     private Map<Integer, Map<Integer, Double>> rows = new HashMap<>();

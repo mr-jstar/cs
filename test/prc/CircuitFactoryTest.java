@@ -43,7 +43,7 @@ public class CircuitFactoryTest {
         double minResistance = 1.0;
         double maxResistance = 1.0;
         CircuitFactory instance = new CircuitFactory();
-        GridPassiveResistiveCircuit result = instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
+        Grid2DPassiveResistiveCircuit result = instance.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
         assertEquals(nCols*nRows, result.noNodes());
         for( int i= 1; i < result.noNodes(); i++ ) {
             //System.out.println((i-1) + "-" + i);

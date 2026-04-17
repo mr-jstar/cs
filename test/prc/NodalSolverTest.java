@@ -19,7 +19,7 @@ public class NodalSolverTest {
         int nRows = 2;
         double minResistance = 1.0;
         double maxResistance = 1.0;
-        GridPassiveResistiveCircuit c = CircuitFactory.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
+        Grid2DPassiveResistiveCircuit c = CircuitFactory.makeGridRCircuit(nCols, nRows, minResistance, maxResistance);
         NodalSolver s = new NodalSolver(c, 0, 3, 1);
         s.solve(1e-6,100);
         double[] v = s.getPotential();
