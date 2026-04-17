@@ -45,6 +45,17 @@ public class NodalSolver {
         double[] cV = new double[c.noNodes()];
         double[] pV = new double[c.noNodes()];
         boolean[] active = new boolean[c.noNodes()];
+        double minS = 0, maxS = 0;
+        for (int i = 0; i < sourceValues.length; i++) {
+            if (sourceValues[i] < minS) {
+                minS = sourceValues[i];
+            }
+            if (sourceValues[i] < maxS) {
+                maxS = sourceValues[i];
+            }
+        }
+        double initialV = (minS + maxS) / 2;
+        Arrays.fill(pV, initialV);
         Arrays.fill(active, true);
         if (groundNodes != null) {
             for (int g : groundNodes) {
@@ -174,6 +185,16 @@ public class NodalSolver {
         double[] cV = new double[n];
         double[] pV = new double[n];
         boolean[] active = new boolean[n];
+        double minS = 0, maxS = 0;
+        for (int i = 0; i < sourceValues.length; i++) {
+            if (sourceValues[i] < minS) {
+                minS = sourceValues[i];
+            }
+            if (sourceValues[i] < maxS) {
+                maxS = sourceValues[i];
+            }
+        }
+        Arrays.fill(pV, (minS + maxS) / 2);
         Arrays.fill(active, true);
         if (groundNodes != null) {
             for (int g : groundNodes) {
@@ -201,7 +222,7 @@ public class NodalSolver {
             threads[i].start();
         }
         stop = false;
-        for (it = 0; it < maxit && ! stop; it++) {
+        for (it = 0; it < maxit && !stop; it++) {
             //System.out.println("Main at 1st barrier");
             barrier.await();
             double maxErr = currErrors[0];
@@ -239,8 +260,8 @@ public class NodalSolver {
     }
 
     public static void main(String[] args) {
-        int nCols = 15;
-        int nRows = 10;
+        int nCols = 100;
+        int nRows = 100;
         double minResistance = 2.0;
         double maxResistance = 2.0;
         try {
@@ -258,13 +279,23 @@ public class NodalSolver {
 
             long start = System.nanoTime();
 
-            //s.solve(1e-6, c.noNodes());
-            s.solveInParallel(1e-6, c.noNodes(), 8);
+            s.solve(1e-6, c.noNodes());
 
             long end = System.nanoTime();
             long elapsed = end - start;
 
-            System.out.println("Czas [ns]: " + elapsed);
+            System.out.println("Serial:\nCzas [ns]: " + elapsed);
+            System.out.println("Czas [ms]: " + elapsed / 1_000_000.0);
+            System.out.println("Czas [s]: " + elapsed / 1e9);
+            
+            start = System.nanoTime();
+
+            s.solveInParallel(1e-6, c.noNodes(), Runtime.getRuntime().availableProcessors());
+
+            end = System.nanoTime();
+            elapsed = end - start;
+
+            System.out.println("Parallel:\nCzas [ns]: " + elapsed);
             System.out.println("Czas [ms]: " + elapsed / 1_000_000.0);
             System.out.println("Czas [s]: " + elapsed / 1e9);
 

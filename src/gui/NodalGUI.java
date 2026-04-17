@@ -9,6 +9,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -85,6 +87,7 @@ public class NodalGUI extends JFrame {
     public NodalGUI() {
         super("Simple Swing GUI");
         options.put("inDefBoundary", false);
+        options.put("showHints", true);
         initGui();
     }
 
@@ -172,6 +175,10 @@ public class NodalGUI extends JFrame {
         });
         optionsMenu.add(nthreadsItem);
         optionsMenu.addSeparator();
+        JMenuItem hintsItem = new JMenuItem("Switch hints on/off");
+        hintsItem.setFont(currentFont);
+        hintsItem.addActionListener(e -> options.put("showHints", !options.get("showHints")));
+        optionsMenu.add(hintsItem);
         optionsMenu.add(new JMenuItem("Font size"));
         ButtonGroup fgroup = new ButtonGroup();
         for (Font f : fonts) {
@@ -220,14 +227,14 @@ public class NodalGUI extends JFrame {
 
     private void generateCircuit() {
         try {
-            String params = readSomething("Enter col# row# Rmin Rmax", "Make grid circuit", "10 5  1.0  2.0");
-            String [] f = params.split("\\s+");
+            String params = readSomething("Enter col# row# Rmin Rmax", "Make grid circuit", "12 8  1.0  2.0");
+            String[] f = params.split("\\s+");
             circ = CircuitFactory.makeGridRCircuit(
-                    Integer.parseInt(f[0]), 
-                    Integer.parseInt(f[1]), 
-              Double.parseDouble(f[2]), 
-              Double.parseDouble(f[3])
-                    );
+                    Integer.parseInt(f[0]),
+                    Integer.parseInt(f[1]),
+                    Double.parseDouble(f[2]),
+                    Double.parseDouble(f[3])
+            );
             maxit = 10 * circ.noNodes();
         } catch (Exception ex) {
             message.setText("Bad parameters");
@@ -305,12 +312,14 @@ public class NodalGUI extends JFrame {
             }
             canvasPanel.repaint();
         } else {
-            JOptionPane.showMessageDialog(this, """
+            if (options.get("showHints")) {
+                JOptionPane.showMessageDialog(this, """
                                                     Click on the node to select it, click on selected to unselect,
                                                     drag mouse to select/deselect all nodes in the rectangle
                                                     when done click "Setup->Add potentials" again or press ESC
                                                     to be asked for the value.""", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
 
+            }
             options.put("inDefBoundary", true);
             currentSelection.clear();
         }
@@ -343,7 +352,7 @@ public class NodalGUI extends JFrame {
                     canvasPanel.repaint();
                     List<Double> err = s.err();
                     if (err.isEmpty() || err.get(err.size() - 1) > tolerance) {
-                        message.setText("The solver failed to converge, err=" + err.get(err.size() - 1));
+                        message.setText("The solver failed to converge in " + err.size() + " iterations. err=" + err.get(err.size() - 1));
                     } else {
                         message.setText("The solver converged in " + err.size() + " iterations.");
                     }
@@ -363,10 +372,18 @@ public class NodalGUI extends JFrame {
                     new Object[]{prompt, field},
                     JOptionPane.QUESTION_MESSAGE,
                     JOptionPane.OK_CANCEL_OPTION
-            );
+            ) {
+                @Override
+                public void selectInitialValue() {
+                    field.requestFocusInWindow();
+                    //field.selectAll();   // opcjonalnie zaznacza domyślną wartość (łatwiej zastąpić)
+                }
+            };
 
             JDialog dialog = pane.createDialog(title);
+
             dialog.setVisible(true);
+
             String m = field.getText();
             if (m == null) {
                 throw new NumberFormatException();
@@ -457,7 +474,7 @@ public class NodalGUI extends JFrame {
                             //System.out.println(elementData);
                             if (V != null && nV >= 0) {
                                 message.setText("V=" + V[nV]);
-                                label.setText("V=" + V[nV]);
+                                label.setText(String.format("V= %.3g", V[nV]));
                                 label.setFont(currentFont);
                                 tooltip.pack();
                                 Point pt = e.getLocationOnScreen();
@@ -535,7 +552,7 @@ public class NodalGUI extends JFrame {
                     //System.out.println("sV=" + sV);
                     if (sV > -1 && sV != nV) {
                         double R = circ.resistance(nV, sV);
-                        return "R= " + R + (V != null && R > 0 && R != Double.POSITIVE_INFINITY ? " I=" + Math.abs(V[sV] - V[nV]) / R : "");
+                        return String.format("R= %.3g", R) + (V != null && R > 0 && R != Double.POSITIVE_INFINITY ? " I=" + String.format("%.3g", Math.abs(V[sV] - V[nV]) / R) : "");
                     }
                 }
                 return null;
@@ -660,9 +677,9 @@ public class NodalGUI extends JFrame {
     }
 
     private void drawResistor(Graphics g, int margin, int dist, int i, int j, int nr) {
-        int lead = dist / 5;          // długość przewodów
+        int lead = Math.max(3, dist / 5);          // długość przewodów
         int bodyHeight = dist - 2 * lead;
-        int bodyWidth = dist / 5;     // szerokość prostokąta
+        int bodyWidth = lead;                       // szerokość prostokąta
         int xi = margin + dist * (i / nr);
         int yi = margin + dist * (i % nr);
         int xj = margin + dist * (j / nr);
@@ -689,9 +706,9 @@ public class NodalGUI extends JFrame {
     }
 
     private void fillResistor(Graphics g, int margin, int dist, int i, int j, int nr, ColorMap cm) {
-        int lead = dist / 5;          // długość przewodów
+        int lead = Math.max(3, dist / 5);          // długość przewodów
         int bodyHeight = dist - 2 * lead;
-        int bodyWidth = dist / 5;     // szerokość prostokąta
+        int bodyWidth = lead;                       // szerokość prostokąta
         int xi = margin + dist * (i / nr);
         int yi = margin + dist * (i % nr);
         int xj = margin + dist * (j / nr);
